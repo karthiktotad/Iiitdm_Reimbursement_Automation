@@ -42,7 +42,7 @@ export default function MyClaims() {
                       <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/faculty/claims/${c.id}`)}>
                         <td style={{ color: '#534AB7', fontWeight: 500 }}>{c.claim_no}</td>
                         <td style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.purpose}</td>
-                        <td style={{ fontSize: 12, color: '#888' }}>{c.project_title}</td>
+                        <td style={{ fontSize: 12, color: '#888' }}>{c.project_no || '—'}</td>
                         <td style={{ textAlign: 'center' }}>{c.item_count}</td>
                         <td style={{ fontWeight: 500 }}>₹{parseFloat(c.total_amount).toLocaleString('en-IN')}</td>
                         <td><span className={`badge ${s.cls}`}>{s.label}</span></td>

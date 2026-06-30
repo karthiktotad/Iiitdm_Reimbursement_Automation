@@ -6,6 +6,7 @@ router.use(verifyToken);
 
 router.post('/',                             requireRole('FACULTY'),         ctrl.createClaim);
 router.post('/:id/items',                    requireRole('FACULTY'),         ctrl.addItem);
+router.delete('/:id/items',                  requireRole('FACULTY'),         ctrl.clearItems);
 router.delete('/:id/items/:itemId',          requireRole('FACULTY'),         ctrl.removeItem);
 router.post('/:id/submit',                   requireRole('FACULTY'),         ctrl.submitClaim);
 router.delete('/:id',                        requireRole('FACULTY'),         ctrl.deleteDraft);

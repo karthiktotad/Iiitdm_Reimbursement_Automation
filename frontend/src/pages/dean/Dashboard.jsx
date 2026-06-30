@@ -35,7 +35,7 @@ export default function DeanDashboard() {
                   <tr key={c.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/dean/claims/${c.id}`)}>
                     <td style={{ color: '#534AB7', fontWeight: 500 }}>{c.claim_no}</td>
                     <td>{c.faculty_name}<br/><span style={{ fontSize: 11, color: '#888' }}>{c.department}</span></td>
-                    <td style={{ fontSize: 12 }}>{c.project_title}</td>
+                    <td style={{ fontSize: 12 }}>{c.project_no || '—'}</td>
                     <td style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12 }}>{c.purpose}</td>
                     <td style={{ fontWeight: 500 }}>₹{parseFloat(c.total_amount).toLocaleString('en-IN')}</td>
                     <td style={{ fontSize: 12, color: '#888' }}>{new Date(c.submitted_at).toLocaleDateString('en-IN')}</td>

@@ -30,10 +30,9 @@ export default function ClaimDetail() {
           <span style={{ fontSize: 12, color: STATUS_COLORS[claim.status] || '#888', fontWeight: 500 }}>{claim.status.replace('_',' ')}</span>
         </div>
         <div className="card-body">
-          <div className="form-row form-row-3" style={{ marginBottom: 12 }}>
-            <div><div style={{ fontSize: 11, color: '#888' }}>Project</div><div style={{ fontWeight: 500, marginTop: 2 }}>{claim.project_no} — {claim.project_title}</div></div>
-            <div><div style={{ fontSize: 11, color: '#888' }}>Funding agency</div><div style={{ fontWeight: 500, marginTop: 2 }}>{claim.funding_agency}</div></div>
-            <div><div style={{ fontSize: 11, color: '#888' }}>Budget head</div><div style={{ fontWeight: 500, marginTop: 2 }}>{claim.budget_head}</div></div>
+          <div className="form-row form-row-2" style={{ marginBottom: 12 }}>
+            <div><div style={{ fontSize: 11, color: '#888' }}>Project</div><div style={{ fontWeight: 500, marginTop: 2 }}>{claim.project_no || '—'}</div></div>
+            <div><div style={{ fontSize: 11, color: '#888' }}>Budget head</div><div style={{ fontWeight: 500, marginTop: 2 }}>{claim.budget_head || '—'}</div></div>
           </div>
           <div><div style={{ fontSize: 11, color: '#888' }}>Purpose</div><div style={{ marginTop: 2 }}>{claim.purpose}</div></div>
         </div>

@@ -29,6 +29,7 @@ export const authApi = {
 export const claimsApi = {
   create:          (data)           => api.post('/claims', data),
   addItem:         (id, item)       => api.post(`/claims/${id}/items`, item),
+  clearItems:      (id)             => api.delete(`/claims/${id}/items`),
   removeItem:      (id, itemId)     => api.delete(`/claims/${id}/items/${itemId}`),
   submit:          (id)             => api.post(`/claims/${id}/submit`),
   getMy:           ()               => api.get('/claims/my'),

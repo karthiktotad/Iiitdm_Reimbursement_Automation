@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { claimsApi, projectsApi } from '../../api';
+import { claimsApi } from '../../api';
+
+const BUDGET_HEADS = ['Consumable', 'Contingency', 'Travel', 'Equipment', 'Others'];
 
 const EMPTY_ITEM = {
   vendor_name: '', bill_no: '', bill_date: '', description: '',
@@ -19,23 +21,14 @@ const calcTotal = (item) => {
 export default function NewClaim() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
-  const [projects, setProjects] = useState([]);
-  const [budgetHeads, setBudgetHeads] = useState([]);
-  const [form, setForm] = useState({ project_id: '', budget_head_id: '', purpose: '' });
+  const [form, setForm] = useState({ project_no: '', budget_head: '', purpose: '' });
   const [claimId, setClaimId] = useState(null);
   const [items, setItems] = useState([{ ...EMPTY_ITEM }]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    projectsApi.getMy().then(r => setProjects(r.data)).catch(console.error);
-  }, []);
-
-  useEffect(() => {
-    if (form.project_id) {
-      projectsApi.getBudgetHeads(form.project_id).then(r => setBudgetHeads(r.data));
-    }
-  }, [form.project_id]);
+  // Track whether items have already been saved to the backend
+  // so we know to clear them before re-saving when the user edits and comes back
+  const itemsSaved = useRef(false);
 
   const handleStep1 = async (e) => {
     e.preventDefault();
@@ -66,9 +59,16 @@ export default function NewClaim() {
     e.preventDefault();
     setError(''); setLoading(true);
     try {
+      // If the user went back from Step 3 to edit, items already exist in the DB.
+      // Clear them all first so we don't accumulate duplicates.
+      if (itemsSaved.current) {
+        await claimsApi.clearItems(claimId);
+      }
+      // Now add the current (possibly edited) items fresh
       for (const item of items) {
         await claimsApi.addItem(claimId, item);
       }
+      itemsSaved.current = true;  // mark that items are now saved
       setStep(3);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to add items');
@@ -86,7 +86,6 @@ export default function NewClaim() {
   };
 
   const grandTotal = items.reduce((s, it) => s + (it.total_amount || 0), 0);
-  const selectedProject = projects.find(p => p.id === form.project_id);
 
   return (
     <>
@@ -95,13 +94,16 @@ export default function NewClaim() {
         <h1 className="page-title" style={{ margin: 0 }}>New reimbursement claim</h1>
       </div>
 
+      {/* ── Stepper ── */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
         {['Project details', 'Bill items', 'Review & submit'].map((label, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12,
+          <div key={i} style={{
+            display: 'flex', alignItems: 'center', gap: 6, fontSize: 12,
             padding: '4px 12px', borderRadius: 20,
             background: step === i+1 ? '#EEEDFE' : step > i+1 ? '#EAF3DE' : '#f5f5f4',
             color: step === i+1 ? '#3C3489' : step > i+1 ? '#27500A' : '#888',
-            fontWeight: step === i+1 ? 500 : 400 }}>
+            fontWeight: step === i+1 ? 500 : 400
+          }}>
             {step > i+1 ? <i className="ti ti-check" /> : <span>{i+1}</span>}
             {label}
           </div>
@@ -110,36 +112,61 @@ export default function NewClaim() {
 
       {error && <div className="alert alert-error"><i className="ti ti-alert-circle" />{error}</div>}
 
+      {/* ── Step 1: Project details ── */}
       {step === 1 && (
         <div className="card">
           <div className="card-header">Step 1 — Project details</div>
           <div className="card-body">
             <form onSubmit={handleStep1}>
+
               <div className="form-group">
-                <label className="form-label">Select project *</label>
-                <select value={form.project_id} onChange={e => setForm({...form, project_id: e.target.value, budget_head_id: ''})} required>
-                  <option value="">-- Select your project --</option>
-                  {projects.map(p => <option key={p.id} value={p.id}>{p.project_no} — {p.title} ({p.funding_agency})</option>)}
-                </select>
+                <label className="form-label">Project number / name *</label>
+                <input
+                  type="text"
+                  value={form.project_no}
+                  onChange={e => setForm({ ...form, project_no: e.target.value })}
+                  placeholder="e.g., DST/2024/001 or SERB Project on Robotics"
+                  required
+                />
+                <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+                  Enter your funding agency project number or a short project name.
+                </div>
               </div>
+
               <div className="form-group">
                 <label className="form-label">Budget head *</label>
-                <select value={form.budget_head_id} onChange={e => setForm({...form, budget_head_id: e.target.value})} required disabled={!form.project_id}>
+                <select
+                  value={form.budget_head}
+                  onChange={e => setForm({ ...form, budget_head: e.target.value })}
+                  required
+                >
                   <option value="">-- Select budget head --</option>
-                  {budgetHeads.map(bh => <option key={bh.id} value={bh.id}>{bh.head_name} (Allocated: ₹{parseFloat(bh.allocated).toLocaleString('en-IN')})</option>)}
+                  {BUDGET_HEADS.map(bh => (
+                    <option key={bh} value={bh}>{bh}</option>
+                  ))}
                 </select>
               </div>
+
               <div className="form-group">
                 <label className="form-label">Purpose of expenditure *</label>
-                <textarea rows={3} value={form.purpose} onChange={e => setForm({...form, purpose: e.target.value})}
-                  placeholder="e.g., AC Repair + Everest Stabilizer 5KVA for Lab 417B" required />
+                <textarea
+                  rows={3}
+                  value={form.purpose}
+                  onChange={e => setForm({ ...form, purpose: e.target.value })}
+                  placeholder="e.g., AC Repair + Everest Stabilizer 5KVA for Lab 417B"
+                  required
+                />
               </div>
-              <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? 'Creating...' : 'Continue →'}</button>
+
+              <button type="submit" className="btn btn-primary" disabled={loading}>
+                {loading ? 'Creating...' : 'Continue →'}
+              </button>
             </form>
           </div>
         </div>
       )}
 
+      {/* ── Step 2: Bill items ── */}
       {step === 2 && (
         <form onSubmit={handleStep2}>
           <div className="alert alert-warning">
@@ -147,12 +174,14 @@ export default function NewClaim() {
             Bills older than 60 days or exceeding ₹25,000 per item will be rejected.
           </div>
 
-          {selectedProject && (
-            <div style={{ background: '#fafaf9', border: '1px solid #e5e5e3', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12, display: 'flex', gap: 20 }}>
-              <span><span style={{ color: '#888' }}>Project: </span><strong>{selectedProject.project_no}</strong></span>
-              <span><span style={{ color: '#888' }}>Agency: </span><strong>{selectedProject.funding_agency}</strong></span>
-            </div>
-          )}
+          {/* Project & budget head summary bar */}
+          <div style={{
+            background: '#fafaf9', border: '1px solid #e5e5e3', borderRadius: 8,
+            padding: '10px 14px', marginBottom: 16, fontSize: 12, display: 'flex', gap: 20, flexWrap: 'wrap'
+          }}>
+            <span><span style={{ color: '#888' }}>Project: </span><strong>{form.project_no}</strong></span>
+            <span><span style={{ color: '#888' }}>Budget head: </span><strong>{form.budget_head}</strong></span>
+          </div>
 
           {items.map((item, idx) => (
             <div key={idx} className="card" style={{ marginBottom: 12 }}>
@@ -170,7 +199,7 @@ export default function NewClaim() {
                   <div className="form-group"><label className="form-label">Bill / invoice no. *</label><input type="text" value={item.bill_no} onChange={e=>updateItem(idx,'bill_no',e.target.value)} required /></div>
                 </div>
                 <div className="form-row form-row-3">
-                  <div className="form-group"><label className="form-label">Bill date *</label><input type="date" value={item.bill_date} onChange={e=>updateItem(idx,'bill_date',e.target.value)} required /></div>
+                  <div className="form-group"><label className="form-label">Bill date *</label><input type="date" value={item.bill_date} onChange={e=>updateItem(idx,'bill_date',e.target.value)} max={new Date().toISOString().split('T')[0]} required /></div>
                   <div className="form-group"><label className="form-label">Quantity *</label><input type="number" min={1} value={item.quantity} onChange={e=>updateItem(idx,'quantity',e.target.value)} required /></div>
                   <div className="form-group"><label className="form-label">Unit price (₹) *</label><input type="number" step="0.01" min={0} value={item.unit_price} onChange={e=>updateItem(idx,'unit_price',e.target.value)} required /></div>
                 </div>
@@ -209,14 +238,15 @@ export default function NewClaim() {
         </form>
       )}
 
+      {/* ── Step 3: Review & Submit ── */}
       {step === 3 && (
         <div>
           <div className="card" style={{ marginBottom: 16 }}>
             <div className="card-header">Review before submitting</div>
             <div className="card-body">
               <div className="form-row form-row-3" style={{ marginBottom: 16 }}>
-                <div><div style={{ fontSize: 11, color: '#888' }}>Project</div><div style={{ fontWeight: 500, marginTop: 2 }}>{selectedProject?.project_no}</div></div>
-                <div><div style={{ fontSize: 11, color: '#888' }}>Funding agency</div><div style={{ fontWeight: 500, marginTop: 2 }}>{selectedProject?.funding_agency}</div></div>
+                <div><div style={{ fontSize: 11, color: '#888' }}>Project</div><div style={{ fontWeight: 500, marginTop: 2 }}>{form.project_no}</div></div>
+                <div><div style={{ fontSize: 11, color: '#888' }}>Budget head</div><div style={{ fontWeight: 500, marginTop: 2 }}>{form.budget_head}</div></div>
                 <div><div style={{ fontSize: 11, color: '#888' }}>Purpose</div><div style={{ fontWeight: 500, marginTop: 2, fontSize: 13 }}>{form.purpose}</div></div>
               </div>
               <table className="table">
